@@ -22,7 +22,7 @@ from caffe2.python import (
 )
 from caffe2.proto import caffe2_pb2
 
-from model_utils import load_init_net, snapshot_init_net
+from model_utils import load_init_net, generate_network_graph
 from model_utils import (
     add_input,
     add_model,
@@ -105,7 +105,7 @@ def build_training_model(config):
             name = '{}_training_model'.format(config['name']),
         )
         data, label = add_input(training_model, config, is_test=False)
-        softmax = add_model(training_model, config, data)
+        softmax = add_model(training_model, data, config)
         softmax_loss = add_softmax_loss(training_model, softmax, label)
         add_training_operators(training_model, config, softmax_loss)
         acc, acc5 = add_accuracy(training_model, softmax, label)
@@ -136,7 +136,7 @@ def build_validation_model(config):
             init_params=False,
         )
         data, label = add_input(validation_model, config, is_test=True)
-        softmax = add_model(validation_model, config, data)
+        softmax = add_model(validation_model, data, config)
         softmax_loss = add_softmax_loss(validation_model, softmax, label)
         add_accuracy(validation_model, softmax, label)
 
@@ -157,37 +157,30 @@ def run_main(config):
     validation_model = build_validation_model(config)
 
     # print network graph
-    """
-    # full-graph
-    mamc_graph = net_drawer.GetPydotGraph(
-        validation_model.net.Proto().op,
-        "mamc_graph",
-        rankdir="TB",
-    )
-    mamc_graph.write_svg("mamc_no_npairloss_graph.svg")
-    print("write graph over...")
-    sys.exit(0)
-
-    # # mini-graph
-    # mamc_graph_mini = net_drawer.GetPydotGraphMinimal(
-    #     validation_model.net.Proto().op,
-    #     "mamc_graph_minimal",
-    #     rankdir="TB",
-    #     minimal_dependency=True
-    # )
-    # mamc_graph_mini.write_svg("mamc_no_npairloss_graph_mini.svg")
-    # print("write graph over...")
+    # generate_network_graph(validation_model, config, use_mini=True)
+    # generate_network_graph(validation_model, config, use_mini=False)
+    # generate_network_graph(validation_model, config, tag="topk", use_mini=True)
+    # generate_network_graph(validation_model, config, tag="topk", use_mini=False)
     # sys.exit(0)
-    """
 
     # experiment params config
-    tag = config['name']
     root_experiments_dir = os.path.join(config['root_dir'], 'experiments')
-    if config['dataset_name'] is not None:
+    assert(config['dataset_name'] is not None)
+    if config['model_name'] is not None:
         root_experiments_dir = os.path.join(
             root_experiments_dir,
-            config['dataset_name'],
+            "{}-{}".format(
+                config['dataset_name'],
+                config['model_name'],
+            ),
         )
+    else:
+        root_experiments_dir = os.path.join(
+            root_experiments_dir, config['dataset_name'])
+
+    config_file_name = os.path.splitext(
+        os.path.basename(config['config_path']))[0]
+    tag = "{}-{}".format(config['name'], config_file_name)
     experiment = Experiment(root_experiments_dir, tag)
     experiment.add_config_file(config['config_path'])
 

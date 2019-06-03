@@ -15,6 +15,7 @@ from caffe2.python import (
     brew,
     utils,
     optimizer,
+    net_drawer,
 )
 from caffe2.proto import caffe2_pb2
 
@@ -26,6 +27,25 @@ from LeNet import (
     add_lenet_full_topk,
 
 )
+from ResNet import (
+    add_resnet20,
+    add_resnet20_conv_topk,
+    add_resnet20_conv_topk_list,
+)
+
+
+MODEL_REGISTER = {
+    "LeNet" : {
+        "original" : add_lenet,
+        "conv_topk": add_lenet_conv_topk,
+    },
+
+    "ResNet20" : {
+        "original" : add_resnet20,
+        "conv_topk": add_resnet20_conv_topk,
+        "conv_topk_list": add_resnet20_conv_topk_list,
+    },
+}
 
 
 
@@ -92,6 +112,47 @@ def snapshot_init_net(params, workspace, snapshot_prefix, snapshot_name,
     with open(init_net_snapshot, 'wb') as f:
         f.write(init_net_proto.SerializeToString())
 
+def generate_network_graph(model, config, tag="", use_mini=True):
+    ''' generate the svg graph that show the network structure
+    Args:
+        use_mini: whether show full nodes of blobs and operators
+        tag: user specific name-tag
+    '''
+    # resolving necessary params
+    graph_dir = os.path.join(config['root_dir'], "output")
+    if tag != "":
+        tag = tag + "_"
+
+    # draw graph
+    if not use_mini:
+        # full-graph
+        full_graph = net_drawer.GetPydotGraph(
+            model.net.Proto().op,
+            "full_graph",
+            rankdir="TB",
+        )
+        graph_path = os.path.join(
+            graph_dir,
+            "{}_{}_{}graph.svg".format(
+                config['model_name'], config['dataset_name'], tag),
+        )
+        full_graph.write_svg(graph_path)
+    else:
+        # mini-graph
+        mini_graph = net_drawer.GetPydotGraphMinimal(
+            model.net.Proto().op,
+            "mini_graph",
+            rankdir="TB",
+            minimal_dependency=True
+        )
+        graph_path = os.path.join(
+            graph_dir,
+            "{}_{}_{}graph_minimal.svg".format(
+                config['model_name'], config['dataset_name'], tag),
+        )
+        mini_graph.write_svg(graph_path)
+    print("[INFO] write graph over...")
+
 
 ##############################################################################
 # model construction utils
@@ -141,16 +202,35 @@ def add_input(model, config, is_test=False):
 
     # stop bp
     model.StopGradient('data', 'data')
-    model.StopGradient('label', 'label')
+    # model.StopGradient('label', 'label') # no need
 
     return data, label
 
 
-def add_model(model, config, data):
+def add_model(model, data, config, is_test=False):
     if config['model_arch']['topk'] is not None:
-        softmax = add_lenet_conv_topk(model, data, config['model_arch']['topk'])
+        if type(config['model_arch']['topk']) is list:
+            add_model_func = MODEL_REGISTER[config['model_name']]['conv_topk_list']
+        else:
+            add_model_func = MODEL_REGISTER[config['model_name']]['conv_topk']
+
+        softmax = add_model_func(
+            model, data,
+            config = config,
+            k = config['model_arch']['topk'],
+            is_test = is_test,
+        )
+        # softmax = add_lenet_conv_topk(model, data, topk)
+        # softmax = add_resnet20_conv_topk(model, data, config, is_test, topk)
     else:
-        softmax = add_lenet(model, data)
+        add_model_func = MODEL_REGISTER[config['model_name']]['original']
+        softmax = add_model_func(
+            model, data,
+            config = config,
+            is_test = is_test,
+        )
+        # softmax = add_lenet(model, data)
+        # softmax = add_resnet20(model, data, config, is_test)
     return softmax
 
 
@@ -174,6 +254,8 @@ def add_optimizer(model, config):
         stepsize = config['solver']['stepsize'],
         # power = config['solver']['power'],
         # max_iter = config['solver']['max_iter'],
+        # policy = "multistep"
+        # stepsize = [100, 200, 500]
     )
 
 

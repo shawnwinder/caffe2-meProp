@@ -1,0 +1,86 @@
+name: "ResNet20-meProp"
+
+dataset_name: "cifar10"
+
+model_name: "ResNet20"
+
+finetune: False
+
+# workspace for initialization
+root_dir: "/home/zhibin/wangxiao/workshop/model-compression/caffe2-meProp"
+
+# which gpu to use
+# gpu_id: 
+# gpu_id: 0
+# gpu_id: 1
+# gpu_id: 2
+gpu_id: 3
+
+model_arch:
+  # the total number of classes
+  num_classes: 10
+  topk: [10, 10, 20, 40]
+  last_conv_size: 8
+
+network:
+  init_net: ""
+
+training_data:
+  # the data source
+  data_path: "/home/zhibin/wangxiao/workshop/model-compression/caffe2-meProp/data/cifar10_encoded_train_lmdb"
+  # the data format
+  data_format: "lmdb"
+  # the transformation for input data
+  input_transform:
+    use_gpu_transform: true
+    use_caffe_datum: false
+    scale: 32
+    batch_size: 128
+    mean_per_channel: [128., 128., 128.]
+    std_per_channel: [1., 1., 1.]
+    crop_size: 32
+
+evaluate_data: 
+  # the data source 
+  data_path: "/home/zhibin/wangxiao/workshop/model-compression/caffe2-meProp/data/cifar10_encoded_val_lmdb"
+  # the data format
+  data_format: "lmdb"
+  # the transformation for input data
+  input_transform:
+    use_gpu_transform: true
+    use_caffe_datum: false
+    scale: 32
+    batch_size: 128
+    mean_per_channel: [128., 128., 128.]
+    std_per_channel: [1., 1., 1.]
+    crop_size: 32
+
+# total num: 60000
+# training num: 50000
+# validation num: 10000
+# training-related parameters
+solver:
+  # training from scratch or not
+  base_learning_rate: 0.1
+  weight_decay: 0.0001
+
+  # momentum sgd 
+  nesterov: 1
+  momentum: 0.9
+  # the learning rate policy, including step, fixed, exp, multistep, poly
+  lr_policy: "step" 
+  stepsize: 23400 # 60 epochs
+  gamma: 0.005
+  power: 1.
+  max_iter: 80000
+
+  # the total iteration number for training
+  max_iterations: 78000 # about 100 epoches, 50000/128 iterations/epoch
+  # how many iterations per training epoch
+  train_iterations: 390
+  # when to display the result for the model
+  display: 5
+  # when to run the validation model
+  test_interval: 390
+  # when run the validation on validation data(8041 imgs), run `test_iterations` iterations on validation model
+  test_iterations: 78

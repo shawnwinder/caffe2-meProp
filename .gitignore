@@ -118,3 +118,4 @@ dmypy.json
 .ropeproject/
 .ipynb_checkpoints/
 *.pyc
+snapshot/

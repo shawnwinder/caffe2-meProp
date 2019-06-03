@@ -2,7 +2,7 @@ name: "LeNet-meProp"
 
 dataset_name: "cifar10"
 
-network_name: "LeNet"
+model_name: "LeNet"
 
 finetune: False
 
@@ -20,6 +20,7 @@ model_arch:
   # the total number of classes
   num_classes: 10
   topk: 10
+  last_conv_size:
 
 network:
   init_net: ""
